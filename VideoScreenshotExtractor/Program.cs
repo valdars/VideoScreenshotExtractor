@@ -8,7 +8,7 @@ namespace VideoScreenshotExtractor
 {
     internal class Program
     {
-        private static readonly string[] videoExtensions = new[] { "mkv" };
+        private static readonly string[] videoExtensions = new[] { "mkv", "avi", "mp4", "mov", "webm", "wmv" };
         private static readonly CancellationTokenSource cancellationTokenSource = new();
         private static string ffmpegPath = null!;
         private static string ffprobePath = null!;
@@ -63,9 +63,10 @@ namespace VideoScreenshotExtractor
             var canceler = new CancellationTokenSource();
             cancellationTokenSource.Token.Register(() => canceler?.Cancel());
 
-            Console.WriteLine($"Starting extractint from {path}");
+            Console.WriteLine($"Starting extracting from {path}");
 
             var duration = await GetDuration(path);
+            var hasHours = duration.TotalHours >= 1;
             var count = (int)Math.Floor(duration.TotalSeconds / opts.Interval);
             // generate timestamps in seconds for all points of thumbnail extraction
             var timestamps = Enumerable.Range(1, count).Select(x => x * opts.Interval);
@@ -74,7 +75,7 @@ namespace VideoScreenshotExtractor
             var thumbnailPath = Path.Combine(PathHelper.RelativePathToAbsolute(opts.OutputDirectory, opts.Path), Path.GetFileNameWithoutExtension(path));
             foreach (var batch in batches)
             {
-                var args = new StringBuilder("-hwaccel auto ");
+                var args = new StringBuilder("-hwaccel auto -y ");
                 foreach (var timestamp in batch)
                 {
                     args.Append($"-ss {timestamp} -i \"{path}\" ");
@@ -83,7 +84,9 @@ namespace VideoScreenshotExtractor
                 var index = 0;
                 foreach (var timestamp in batch)
                 {
-                    args.Append($"-map {index}:v -vframes 1 \"{thumbnailPath} {timestamp}.jpg\" ");
+                    var timespan = TimeSpan.FromSeconds(timestamp);
+                    var formatted = hasHours ? timespan.ToString(@"hh\-mm\-ss") : timespan.ToString(@"mm\-ss");
+                    args.Append($"-map {index}:v -vframes 1 \"{thumbnailPath} {formatted}.jpg\" ");
                     index++;
                 }
 
